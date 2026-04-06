@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QWEN AI Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #2a2a3a;
+    --accent: #7c6aff;
+    --accent2: #ff6a9e;
+    --accent3: #6affda;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --error: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* BG mesh */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse 80% 50% at 10% 20%, rgba(124,106,255,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 90% 80%, rgba(255,106,158,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 50% at 50% 50%, rgba(106,255,218,0.04) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+  /* HEADER */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,15,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800; font-size: 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent3); -webkit-text-fill-color: var(--accent3); }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* TABS */
+  .tabs {
+    display: flex; gap: 4px;
+    padding: 12px 16px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    overflow-x: auto;
+    scrollbar-width: none;
+    position: relative; z-index: 1;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    border-radius: 8px 8px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    cursor: pointer;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600; font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: all 0.2s;
+    background: transparent;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .tab.active {
+    color: var(--text);
+    background: var(--bg);
+    border-color: var(--border);
+  }
+  .tab.active .tab-icon { filter: drop-shadow(0 0 4px currentColor); }
+  .tab[data-tab="generate"] .tab-icon { color: var(--accent); }
+  .tab[data-tab="edit"] .tab-icon { color: var(--accent2); }
+  .tab[data-tab="video"] .tab-icon { color: var(--accent3); }
+
+  /* MAIN */
+  main { position: relative; z-index: 1; }
+  .panel { display: none; padding: 16px; max-width: 1200px; margin: 0 auto; }
+  .panel.active { display: block; }
+
+  /* LAYOUT: 2-col on desktop */
+  .workspace {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media(max-width: 768px) {
+    .workspace { grid-template-columns: 1fr; }
+  }
+
+  /* CARD */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700; font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text);
+  }
+  .card-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* FORM ELEMENTS */
+  label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; display: block; margin-bottom: 6px; }
+  textarea, input[type="text"], select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    transition: border-color 0.2s;
+    outline: none;
+    resize: none;
+  }
+  textarea:focus, input[type="text"]:focus, select:focus { border-color: var(--accent); }
+  textarea { min-height: 90px; }
+  select option { background: var(--card); }
+
+  /* RANGE */
+  .range-wrap { display: flex; align-items: center; gap: 10px; }
+  .range-wrap input[type="range"] {
+    flex: 1; appearance: none; height: 4px;
+    background: var(--border); border-radius: 2px; cursor: pointer;
+    padding: 0; border: none;
+  }
+  .range-wrap input[type="range"]::-webkit-slider-thumb {
+    appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--accent); cursor: pointer;
+  }
+  .range-val {
+    font-size: 12px; color: var(--accent); min-width: 30px; text-align: right;
+    font-weight: 500;
+  }
+
+  /* GRID OPTIONS */
+  .opt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; }
+  .opt-btn {
+    padding: 7px 4px; border: 1px solid var(--border);
+    border-radius: 7px; background: var(--surface);
+    color: var(--muted); font-size: 11px; font-family: 'DM Mono', monospace;
+    cursor: pointer; transition: all 0.15s; text-align: center;
+    white-space: nowrap;
+  }
+  .opt-btn:hover { border-color: var(--accent); color: var(--text); }
+  .opt-btn.sel { border-color: var(--accent); background: rgba(124,106,255,0.12); color: var(--accent); }
+  .opt-btn.sel2 { border-color: var(--accent2); background: rgba(255,106,158,0.12); color: var(--accent2); }
+  .opt-btn.sel3 { border-color: var(--accent3); background: rgba(106,255,218,0.12); color: var(--accent3); }
+
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px; padding: 20px;
+    text-align: center; cursor: pointer;
+    transition: all 0.2s; position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent2); background: rgba(255,106,158,0.05); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-zone .uz-icon { font-size: 28px; margin-bottom: 6px; }
+  .upload-zone p { font-size: 12px; color: var(--muted); }
+  .upload-zone small { font-size: 10px; color: var(--muted); opacity: 0.6; }
+  .preview-img {
+    width: 100%; border-radius: 8px; margin-top: 10px;
+    max-height: 180px; object-fit: cover; display: none;
+  }
+
+  /* GENERATE BUTTON */
+  .btn-gen {
+    width: 100%; padding: 13px;
+    border-radius: 10px; border: none;
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 14px; letter-spacing: 0.5px;
+    cursor: pointer; transition: all 0.2s;
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-gen.primary {
+    background: linear-gradient(135deg, var(--accent), #9c6aff);
+    color: white;
+    box-shadow: 0 4px 20px rgba(124,106,255,0.3);
+  }
+  .btn-gen.primary:hover { box-shadow: 0 4px 30px rgba(124,106,255,0.5); transform: translateY(-1px); }
+  .btn-gen.pink {
+    background: linear-gradient(135deg, var(--accent2), #ff9a6a);
+    color: white;
+    box-shadow: 0 4px 20px rgba(255,106,158,0.3);
+  }
+  .btn-gen.pink:hover { box-shadow: 0 4px 30px rgba(255,106,158,0.5); transform: translateY(-1px); }
+  .btn-gen.teal {
+    background: linear-gradient(135deg, #20b2aa, var(--accent3));
+    color: #0a0a0f;
+    box-shadow: 0 4px 20px rgba(106,255,218,0.3);
+  }
+  .btn-gen.teal:hover { box-shadow: 0 4px 30px rgba(106,255,218,0.5); transform: translateY(-1px); }
+  .btn-gen:active { transform: translateY(0) scale(0.98); }
+  .btn-gen:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+  .btn-gen::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .btn-gen:hover::after { opacity: 1; }
+
+  /* OUTPUT AREA */
+  .output-area {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; min-height: 420px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .output-placeholder {
+    text-align: center; padding: 40px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .output-placeholder .ph-icon { font-size: 48px; opacity: 0.2; }
+  .output-placeholder p { font-size: 13px; color: var(--muted); }
+
+  /* RESULTS GRID */
+  .results-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px; padding: 16px; width: 100%;
+  }
+  .result-item {
+    border-radius: 10px; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border);
+    position: relative; group: true;
+    transition: transform 0.2s;
+  }
+  .result-item:hover { transform: translateY(-2px); }
+  .result-item img, .result-item video {
+    width: 100%; display: block;
+    aspect-ratio: 1; object-fit: cover;
+  }
+  .result-item video { aspect-ratio: 16/9; }
+  .result-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.6); opacity: 0;
+    transition: opacity 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .result-item:hover .result-overlay { opacity: 1; }
+  .result-btn {
+    padding: 6px 12px; border-radius: 6px; border: none;
+    font-size: 11px; cursor: pointer; font-family: 'DM Mono', monospace;
+    font-weight: 500;
+  }
+  .rb-dl { background: var(--accent); color: white; }
+  .rb-use { background: var(--accent2); color: white; }
+
+  /* LOADING */
+  .loading-state { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 40px; }
+  .loader {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  .loader.pink { border-top-color: var(--accent2); }
+  .loader.teal { border-top-color: var(--accent3); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-state p { font-size: 12px; color: var(--muted); animation: pulse 1.5s infinite; }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 20px; right: 20px; z-index: 999;
+    padding: 12px 18px; border-radius: 10px;
+    font-size: 13px; font-family: 'DM Mono', monospace;
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s; pointer-events: none;
+    max-width: 300px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.ok { background: rgba(74,222,128,0.15); border: 1px solid var(--success); color: var(--success); }
+  #toast.err { background: rgba(248,113,113,0.15); border: 1px solid var(--error); color: var(--error); }
+  #toast.info { background: rgba(124,106,255,0.15); border: 1px solid var(--accent); color: var(--accent); }
+
+  /* BADGE */
+  .badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 20px;
+    font-family: 'DM Mono', monospace; letter-spacing: 0.3px;
+  }
+  .badge-v { background: rgba(74,222,128,0.15); color: var(--success); border: 1px solid rgba(74,222,128,0.3); }
+  .badge-e { background: rgba(255,106,158,0.15); color: var(--accent2); border: 1px solid rgba(255,106,158,0.3); }
+  .badge-g { background: rgba(124,106,255,0.15); color: var(--accent); border: 1px solid rgba(124,106,255,0.3); }
+
+  /* SECTION LABEL */
+  .sec-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); padding-bottom: 8px;
+    border-bottom: 1px solid var(--border); margin-bottom: 4px;
+  }
+
+  /* NEGATIVE PROMPT */
+  .neg-toggle {
+    font-size: 11px; color: var(--muted); cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+    user-select: none;
+  }
+  .neg-toggle:hover { color: var(--text); }
+  .neg-area { display: none; }
+  .neg-area.open { display: block; }
+
+  /* PROGRESS BAR */
+  .prog-bar {
+    width: 100%; height: 3px; background: var(--border);
+    border-radius: 2px; overflow: hidden; margin-top: 8px;
+  }
+  .prog-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.3s; border-radius: 2px;
+  }
+
+  /* STYLE CHIPS */
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    padding: 4px 10px; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 11px; cursor: pointer; transition: all 0.15s;
+    color: var(--muted);
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { border-color: var(--accent); background: rgba(124,106,255,0.12); color: var(--accent); }
+  .chip.active2 { border-color: var(--accent2); background: rgba(255,106,158,0.12); color: var(--accent2); }
+  .chip.active3 { border-color: var(--accent3); background: rgba(106,255,218,0.12); color: var(--accent3); }
+
+  /* VIDEO PREVIEW */
+  .video-preview-wrap { position: relative; border-radius: 10px; overflow: hidden; }
+  .video-preview-wrap video { width: 100%; border-radius: 10px; }
+
+  /* TOGGLE SWITCH */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .toggle {
+    width: 36px; height: 20px; border-radius: 10px;
+    background: var(--border); position: relative; cursor: pointer;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: white; transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(16px); }
+
+  .small-info { font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+  /* MOBILE NAV */
+  @media(max-width: 480px) {
+    header { padding: 0 12px; }
+    .logo { font-size: 15px; }
+    .panel { padding: 12px; }
+    .card-body { padding: 12px; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">QWEN<span>.</span>STUDIO</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge badge-v" style="font-size:9px" id="conn-badge">CHECKING...</span>
+    <div class="status-dot" id="conn-dot" style="background:var(--warning);box-shadow:0 0 8px var(--warning)"></div>
+  </div>
+</header>
+
+<!-- CORS Warning Banner -->
+<div id="cors-banner" style="display:none;background:rgba(251,191,36,0.1);border-bottom:1px solid rgba(251,191,36,0.3);padding:10px 16px;font-size:11px;color:var(--warning);line-height:1.6;position:relative;z-index:99">
+  ⚠️ <strong>API tidak dapat dijangkau.</strong> Pastikan environment variable <code style="background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px">DASHSCOPE_API_KEY</code> sudah diset di Vercel Dashboard → Settings → Environment Variables.
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="generate" onclick="switchTab('generate')">
+    <span class="tab-icon" style="color:var(--accent)">✦</span> Generate
+  </button>
+  <button class="tab" data-tab="edit" onclick="switchTab('edit')">
+    <span class="tab-icon" style="color:var(--accent2)">◈</span> Edit Image
+  </button>
+  <button class="tab" data-tab="video-text" onclick="switchTab('video-text')">
+    <span class="tab-icon" style="color:var(--accent3)">▶</span> Text→Video
+  </button>
+  <button class="tab" data-tab="video-img" onclick="switchTab('video-img')">
+    <span class="tab-icon" style="color:var(--accent3)">⬡</span> Image→Video
+  </button>
+</div>
+
+<main>
+
+<!-- ===== GENERATE IMAGE ===== -->
+<div id="panel-generate" class="panel active">
+  <div class="workspace">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent)">✦</span>
+          <span class="card-title">Prompt</span>
+          <span class="badge badge-g" style="margin-left:auto">Generate</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Deskripsi gambar</label>
+            <textarea id="gen-prompt" placeholder="Describe your image in detail... e.g. A futuristic city at sunset, neon lights reflecting on wet streets, cinematic composition"></textarea>
+          </div>
+          <div>
+            <div class="neg-toggle" onclick="toggleNeg('gen')">
+              <span id="neg-arrow-gen">▸</span> Negative Prompt
+            </div>
+            <div id="neg-gen" class="neg-area" style="margin-top:8px">
+              <textarea id="gen-negative" style="min-height:60px" placeholder="What to avoid... e.g. blurry, ugly, watermark, text"></textarea>
+            </div>
+          </div>
+          <div>
+            <label>Style Preset</label>
+            <div class="chips" id="gen-styles">
+              <span class="chip active" data-style="">Auto</span>
+              <span class="chip" data-style="photorealistic">Photo</span>
+              <span class="chip" data-style="anime">Anime</span>
+              <span class="chip" data-style="oil painting">Oil Paint</span>
+              <span class="chip" data-style="watercolor">Watercolor</span>
+              <span class="chip" data-style="3d render">3D</span>
+              <span class="chip" data-style="cinematic">Cinematic</span>
+              <span class="chip" data-style="sketch">Sketch</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent)">⚙</span>
+          <span class="card-title">Parameters</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Model</label>
+            <select id="gen-model">
+              <option value="wanx2.1-t2i-turbo">wanx2.1-t2i-turbo (Fast)</option>
+              <option value="wanx2.1-t2i-plus" selected>wanx2.1-t2i-plus (Quality)</option>
+              <option value="wanx-v1">wanx-v1 (Classic)</option>
+            </select>
+          </div>
+          <div>
+            <label>Aspect Ratio / Resolusi</label>
+            <div class="opt-grid" id="gen-size">
+              <button class="opt-btn sel" data-val="1024*1024">1:1</button>
+              <button class="opt-btn" data-val="1280*720">16:9</button>
+              <button class="opt-btn" data-val="720*1280">9:16</button>
+              <button class="opt-btn" data-val="1280*960">4:3</button>
+              <button class="opt-btn" data-val="960*1280">3:4</button>
+              <button class="opt-btn" data-val="1024*576">21:9</button>
+            </div>
+          </div>
+          <div>
+            <label>Jumlah Gambar</label>
+            <div class="opt-grid" id="gen-count">
+              <button class="opt-btn sel" data-val="1">1</button>
+              <button class="opt-btn" data-val="2">2</button>
+              <button class="opt-btn" data-val="4">4</button>
+            </div>
+          </div>
+          <div>
+            <label>Steps — Detail Level</label>
+            <div class="range-wrap">
+              <input type="range" id="gen-steps" min="10" max="50" value="30" oninput="updRange('gen-steps','gen-steps-val')">
+              <span class="range-val" id="gen-steps-val">30</span>
+            </div>
+          </div>
+          <div>
+            <label>Guidance Scale — Prompt Fidelity</label>
+            <div class="range-wrap">
+              <input type="range" id="gen-cfg" min="1" max="20" step="0.5" value="7.5" oninput="updRange('gen-cfg','gen-cfg-val')">
+              <span class="range-val" id="gen-cfg-val">7.5</span>
+            </div>
+          </div>
+          <div>
+            <label>Seed (0 = random)</label>
+            <input type="text" id="gen-seed" placeholder="0" value="0">
+          </div>
+          <button class="btn-gen primary" onclick="generateImage()">
+            <span>✦</span> Generate Image
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- OUTPUT -->
+    <div>
+      <div class="output-area" id="gen-output">
+        <div class="output-placeholder">
+          <div class="ph-icon">🎨</div>
+          <p>Output akan muncul di sini</p>
+          <p style="font-size:11px;color:var(--muted);opacity:0.6">Isi prompt & klik Generate</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EDIT IMAGE ===== -->
+<div id="panel-edit" class="panel">
+  <div class="workspace">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent2)">◈</span>
+          <span class="card-title">Upload & Edit</span>
+          <span class="badge badge-e" style="margin-left:auto">Edit</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Gambar Sumber 1 <span style="color:var(--error)">*</span></label>
+            <div class="upload-zone" id="edit-zone" ondragover="dragOver(event,'edit-zone')" ondragleave="dragLeave('edit-zone')" ondrop="dropFile(event,'edit-zone','edit-file')">
+              <input type="file" id="edit-file" accept="image/*" onchange="previewUpload('edit-file','edit-preview','edit-zone')">
+              <div class="uz-icon">📁</div>
+              <p>Drop gambar atau klik upload</p>
+              <small>PNG, JPG, WEBP — maks 10MB</small>
+              <img id="edit-preview" class="preview-img" alt="preview">
+            </div>
+          </div>
+          <div>
+            <label>Gambar Referensi 2 <span style="color:var(--muted)">(opsional, multi-image fusion)</span></label>
+            <div class="upload-zone" id="edit-zone2" ondragover="dragOver(event,'edit-zone2')" ondragleave="dragLeave('edit-zone2')" ondrop="dropFile(event,'edit-zone2','edit-file2')">
+              <input type="file" id="edit-file2" accept="image/*" onchange="previewUpload('edit-file2','edit-preview2','edit-zone2')">
+              <div class="uz-icon" style="font-size:20px">➕</div>
+              <p>Gambar referensi ke-2</p>
+              <small>Untuk style/pose/clothing fusion</small>
+              <img id="edit-preview2" class="preview-img" alt="preview2">
+            </div>
+          </div>
+          <div>
+            <label>Gambar Referensi 3 <span style="color:var(--muted)">(opsional)</span></label>
+            <div class="upload-zone" id="edit-zone3" ondragover="dragOver(event,'edit-zone3')" ondragleave="dragLeave('edit-zone3')" ondrop="dropFile(event,'edit-zone3','edit-file3')">
+              <input type="file" id="edit-file3" accept="image/*" onchange="previewUpload('edit-file3','edit-preview3','edit-zone3')">
+              <div class="uz-icon" style="font-size:20px">➕</div>
+              <p>Gambar referensi ke-3</p>
+              <small>Untuk multi-image fusion lanjutan</small>
+              <img id="edit-preview3" class="preview-img" alt="preview3">
+            </div>
+          </div>
+          <div>
+            <label>Edit Instruction</label>
+            <textarea id="edit-prompt" placeholder="Describe what to change... e.g. Change the sky to sunset, add glasses to the person, make it look vintage&#10;&#10;Multi-image: Make the girl from Image 1 wear the black dress from Image 2"></textarea>
+          </div>
+          <div>
+            <div class="neg-toggle" onclick="toggleNeg('edit')">
+              <span id="neg-arrow-edit">▸</span> Negative Prompt
+            </div>
+            <div id="neg-edit" class="neg-area" style="margin-top:8px">
+              <textarea id="edit-negative" style="min-height:60px" placeholder="What to avoid..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent2)">⚙</span>
+          <span class="card-title">Edit Parameters</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Model</label>
+            <select id="edit-model">
+              <option value="qwen-image-2.0-pro" selected>qwen-image-2.0-pro ✦ Recommended</option>
+              <option value="qwen-image-2.0">qwen-image-2.0 (Balanced Speed)</option>
+              <option value="qwen-image-edit-max">qwen-image-edit-max (Industrial/Geometry)</option>
+              <option value="qwen-image-edit-plus">qwen-image-edit-plus (Multi-output)</option>
+              <option value="qwen-image-edit">qwen-image-edit (Single image)</option>
+            </select>
+            <div class="small-info" style="margin-top:6px" id="edit-model-desc">
+              Pro series — terbaik untuk text rendering, realistic texture, dan semantic editing.
+            </div>
+          </div>
+          <div>
+            <label>Output Size</label>
+            <div class="opt-grid" id="edit-size">
+              <button class="opt-btn sel2" data-val="1024*1024">1:1</button>
+              <button class="opt-btn" data-val="1536*1024">3:2</button>
+              <button class="opt-btn" data-val="1024*1536">2:3</button>
+              <button class="opt-btn" data-val="1280*720">16:9</button>
+              <button class="opt-btn" data-val="720*1280">9:16</button>
+              <button class="opt-btn" data-val="2048*1024">2:1</button>
+            </div>
+          </div>
+          <div>
+            <label>Jumlah Output <span class="small-info">(1-6, tidak tersedia untuk qwen-image-edit)</span></label>
+            <div class="opt-grid" id="edit-count">
+              <button class="opt-btn sel2" data-val="1">1</button>
+              <button class="opt-btn" data-val="2">2</button>
+              <button class="opt-btn" data-val="4">4</button>
+            </div>
+          </div>
+          <div class="toggle-row">
+            <label style="margin:0">Prompt Extend (Auto-enhance)</label>
+            <div class="toggle on" id="edit-prompt-extend" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="toggle-row">
+            <label style="margin:0">Watermark</label>
+            <div class="toggle" id="edit-watermark" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <button class="btn-gen pink" onclick="editImage()">
+            <span>◈</span> Edit Image
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="output-area" id="edit-output">
+        <div class="output-placeholder">
+          <div class="ph-icon">🖼️</div>
+          <p>Gambar hasil edit muncul di sini</p>
+          <p style="font-size:11px;color:var(--muted);opacity:0.6">Upload gambar & isi instruksi</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TEXT TO VIDEO ===== -->
+<div id="panel-video-text" class="panel">
+  <div class="workspace">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent3)">▶</span>
+          <span class="card-title">Text → Video</span>
+          <span class="badge badge-v" style="margin-left:auto">T2V</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Deskripsi Video</label>
+            <textarea id="t2v-prompt" style="min-height:100px" placeholder="Describe the video scene... e.g. A camera slowly panning through a dense neon-lit cyberpunk city at night, rain falling, people walking with umbrellas"></textarea>
+          </div>
+          <div>
+            <div class="neg-toggle" onclick="toggleNeg('t2v')">
+              <span id="neg-arrow-t2v">▸</span> Negative Prompt
+            </div>
+            <div id="neg-t2v" class="neg-area" style="margin-top:8px">
+              <textarea id="t2v-negative" style="min-height:60px" placeholder="What to avoid..."></textarea>
+            </div>
+          </div>
+          <div>
+            <label>Style</label>
+            <div class="chips" id="t2v-styles">
+              <span class="chip active3" data-style="">Auto</span>
+              <span class="chip" data-style="cinematic">Cinematic</span>
+              <span class="chip" data-style="anime">Anime</span>
+              <span class="chip" data-style="realistic">Realistic</span>
+              <span class="chip" data-style="3d animation">3D Anim</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent3)">⚙</span>
+          <span class="card-title">Video Parameters</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Model</label>
+            <select id="t2v-model">
+              <option value="wan2.1-t2v-turbo">wan2.1-t2v-turbo (Fast)</option>
+              <option value="wan2.1-t2v-plus" selected>wan2.1-t2v-plus (Quality)</option>
+            </select>
+          </div>
+          <div>
+            <label>Resolusi</label>
+            <div class="opt-grid" id="t2v-res">
+              <button class="opt-btn sel3" data-val="1280*720">720p</button>
+              <button class="opt-btn" data-val="1920*1080">1080p</button>
+              <button class="opt-btn" data-val="720*1280">720p↑</button>
+              <button class="opt-btn" data-val="480*848">480p</button>
+            </div>
+          </div>
+          <div>
+            <label>Aspect Ratio</label>
+            <div class="opt-grid" id="t2v-ratio">
+              <button class="opt-btn sel3" data-val="16:9">16:9</button>
+              <button class="opt-btn" data-val="9:16">9:16</button>
+              <button class="opt-btn" data-val="1:1">1:1</button>
+              <button class="opt-btn" data-val="4:3">4:3</button>
+            </div>
+          </div>
+          <div>
+            <label>Durasi Video</label>
+            <div class="opt-grid" id="t2v-dur">
+              <button class="opt-btn sel3" data-val="5">5s</button>
+              <button class="opt-btn" data-val="10">10s</button>
+            </div>
+          </div>
+          <div>
+            <label>Frame Rate</label>
+            <div class="opt-grid" id="t2v-fps">
+              <button class="opt-btn sel3" data-val="16">16fps</button>
+              <button class="opt-btn" data-val="24">24fps</button>
+            </div>
+          </div>
+          <div class="small-info">⚠ Video generation membutuhkan waktu 1-5 menit. Jangan tutup halaman ini.</div>
+          <button class="btn-gen teal" onclick="generateVideo('text')">
+            <span>▶</span> Generate Video
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="output-area" id="t2v-output">
+        <div class="output-placeholder">
+          <div class="ph-icon">🎬</div>
+          <p>Video output muncul di sini</p>
+          <p style="font-size:11px;color:var(--muted);opacity:0.6">Proses ~1-5 menit</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== IMAGE TO VIDEO ===== -->
+<div id="panel-video-img" class="panel">
+  <div class="workspace">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent3)">⬡</span>
+          <span class="card-title">Image → Video</span>
+          <span class="badge badge-v" style="margin-left:auto">I2V</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Upload Gambar Sumber</label>
+            <div class="upload-zone" id="i2v-zone" ondragover="dragOver(event,'i2v-zone')" ondragleave="dragLeave('i2v-zone')" ondrop="dropFile(event,'i2v-zone','i2v-file')">
+              <input type="file" id="i2v-file" accept="image/*" onchange="previewUpload('i2v-file','i2v-preview','i2v-zone')">
+              <div class="uz-icon">🖼️</div>
+              <p>Drop gambar atau klik untuk upload</p>
+              <small>PNG, JPG, WEBP — maks 10MB</small>
+              <img id="i2v-preview" class="preview-img" alt="preview">
+            </div>
+          </div>
+          <div>
+            <label>Prompt Gerakan (Opsional)</label>
+            <textarea id="i2v-prompt" style="min-height:70px" placeholder="Describe the motion... e.g. Camera slowly zooms in, leaves gently swaying in the wind"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span style="color:var(--accent3)">⚙</span>
+          <span class="card-title">Video Parameters</span>
+        </div>
+        <div class="card-body">
+          <div>
+            <label>Model</label>
+            <select id="i2v-model">
+              <option value="wan2.1-i2v-turbo">wan2.1-i2v-turbo (Fast)</option>
+              <option value="wan2.1-i2v-plus" selected>wan2.1-i2v-plus (Quality)</option>
+            </select>
+          </div>
+          <div>
+            <label>Resolusi</label>
+            <div class="opt-grid" id="i2v-res">
+              <button class="opt-btn sel3" data-val="1280*720">720p</button>
+              <button class="opt-btn" data-val="1920*1080">1080p</button>
+              <button class="opt-btn" data-val="720*1280">720p↑</button>
+              <button class="opt-btn" data-val="480*848">480p</button>
+            </div>
+          </div>
+          <div>
+            <label>Durasi Video</label>
+            <div class="opt-grid" id="i2v-dur">
+              <button class="opt-btn sel3" data-val="5">5s</button>
+              <button class="opt-btn" data-val="10">10s</button>
+            </div>
+          </div>
+          <div>
+            <label>Frame Rate</label>
+            <div class="opt-grid" id="i2v-fps">
+              <button class="opt-btn sel3" data-val="16">16fps</button>
+              <button class="opt-btn" data-val="24">24fps</button>
+            </div>
+          </div>
+          <div>
+            <label>Motion Strength</label>
+            <div class="range-wrap">
+              <input type="range" id="i2v-motion" min="0.1" max="1" step="0.05" value="0.5" oninput="updRange('i2v-motion','i2v-motion-val')">
+              <span class="range-val" id="i2v-motion-val">0.5</span>
+            </div>
+          </div>
+          <div class="small-info">⚠ Video generation membutuhkan waktu 1-5 menit.</div>
+          <button class="btn-gen teal" onclick="generateVideo('image')">
+            <span>⬡</span> Animate Image
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="output-area" id="i2v-output">
+        <div class="output-placeholder">
+          <div class="ph-icon">🎥</div>
+          <p>Animasi muncul di sini</p>
+          <p style="font-size:11px;color:var(--muted);opacity:0.6">Upload gambar & klik Animate</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── API Configuration ─────────────────────────────────────────
+// API key disimpan di environment variable Vercel (DASHSCOPE_API_KEY)
+// Tidak perlu diisi di sini — proxy server di /api/proxy yang menangani
+const API_KEY = ''; // Kosongkan — pakai env var di Vercel
+const COMPAT_BASE = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+const NATIVE_BASE = 'https://dashscope-intl.aliyuncs.com/api/v1';
+
+// ── Proxy-aware fetch ─────────────────────────────────────────
+// Di Vercel: semua request di-relay lewat /api/proxy?url=...
+// Di localhost: bisa pakai /proxy?url=... (proxy-server.js lama)
+const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+function proxyWrap(fullUrl) {
+  const proxyPath = IS_LOCAL ? '/proxy' : '/api/proxy';
+  return `${proxyPath}?url=${encodeURIComponent(fullUrl)}`;
+}
+
+async function apiFetch(fullUrl, init = {}) {
+  // API key hanya dikirim dari client jika ada (opsional, env var lebih aman)
+  const authHeader = API_KEY ? `Bearer ${API_KEY}` : undefined;
+  init.headers = Object.assign(
+    { 'Content-Type': 'application/json' },
+    authHeader ? { 'Authorization': authHeader } : {},
+    init.headers || {}
+  );
+  try {
+    const res = await fetch(proxyWrap(fullUrl), init);
+    return res;
+  } catch (e) {
+    throw new Error('❌ Network Error: ' + e.message);
+  }
+}
+
+// ===== STATE =====
+const state = {
+  genSize: '1024*1024', genCount: '1',
+  editSize: '1024*1024', editCount: '1',
+  t2vRes: '1280*720', t2vRatio: '16:9', t2vDur: '5', t2vFps: '16',
+  i2vRes: '1280*720', i2vDur: '5', i2vFps: '16',
+  genStyle: '', t2vStyle: '',
+  editFile: null, editFile2: null, editFile3: null, i2vFile: null
+};
+
+// ===== TABS =====
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
+// ===== RANGE =====
+function updRange(id, valId) {
+  document.getElementById(valId).textContent = document.getElementById(id).value;
+}
+
+// ===== OPT BUTTONS =====
+function setupOptGrid(gridId, stateKey, selClass = 'sel') {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.querySelectorAll('.opt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      grid.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('sel','sel2','sel3'));
+      btn.classList.add(selClass);
+      state[stateKey] = btn.dataset.val;
+    });
+  });
+}
+
+// ===== STYLE CHIPS =====
+function setupChips(groupId, stateKey, selClass = 'active') {
+  const group = document.getElementById(groupId);
+  if (!group) return;
+  group.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      group.querySelectorAll('.chip').forEach(c => c.classList.remove('active','active2','active3'));
+      chip.classList.add(selClass);
+      state[stateKey] = chip.dataset.style;
+    });
+  });
+}
+
+setupOptGrid('gen-size', 'genSize', 'sel');
+setupOptGrid('gen-count', 'genCount', 'sel');
+setupOptGrid('edit-size', 'editSize', 'sel2');
+setupOptGrid('edit-count', 'editCount', 'sel2');
+setupOptGrid('t2v-res', 't2vRes', 'sel3');
+setupOptGrid('t2v-ratio', 't2vRatio', 'sel3');
+setupOptGrid('t2v-dur', 't2vDur', 'sel3');
+setupOptGrid('t2v-fps', 't2vFps', 'sel3');
+setupOptGrid('i2v-res', 'i2vRes', 'sel3');
+setupOptGrid('i2v-dur', 'i2vDur', 'sel3');
+setupOptGrid('i2v-fps', 'i2vFps', 'sel3');
+setupChips('gen-styles', 'genStyle', 'active');
+setupChips('t2v-styles', 't2vStyle', 'active3');
+
+// Model description tooltips for edit
+const editModelDesc = {
+  'qwen-image-2.0-pro': 'Pro series — terbaik untuk text rendering, realistic texture, semantic editing. Max 6 output.',
+  'qwen-image-2.0': 'Balanced — performa & kecepatan seimbang. Cocok untuk editing umum. Max 6 output.',
+  'qwen-image-edit-max': 'Max series — unggul untuk industrial design, geometric reasoning, karakter konsisten.',
+  'qwen-image-edit-plus': 'Plus series — mendukung multi-image output & resolusi custom.',
+  'qwen-image-edit': 'Standard — single-image editing & multi-image fusion. Output hanya 1 gambar.'
+};
+document.getElementById('edit-model').addEventListener('change', function() {
+  document.getElementById('edit-model-desc').textContent = editModelDesc[this.value] || '';
+  if (this.value === 'qwen-image-edit') {
+    document.querySelectorAll('#edit-count .opt-btn').forEach(b => { b.disabled = true; b.style.opacity='0.4'; });
+  } else {
+    document.querySelectorAll('#edit-count .opt-btn').forEach(b => { b.disabled = false; b.style.opacity='1'; });
+  }
+});
+
+// ===== NEGATIVE PROMPT TOGGLE =====
+function toggleNeg(id) {
+  const area = document.getElementById(`neg-${id}`);
+  const arrow = document.getElementById(`neg-arrow-${id}`);
+  area.classList.toggle('open');
+  arrow.textContent = area.classList.contains('open') ? '▾' : '▸';
+}
+
+// ===== UPLOAD =====
+function previewUpload(inputId, previewId, zoneId) {
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    if (inputId === 'edit-file') state.editFile = file;
+    if (inputId === 'edit-file2') state.editFile2 = file;
+    if (inputId === 'edit-file3') state.editFile3 = file;
+    if (inputId === 'i2v-file') state.i2vFile = file;
+    const reader = new FileReader();
+    reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(file);
+  }
+}
+function dragOver(e, zoneId) { e.preventDefault(); document.getElementById(zoneId).classList.add('drag'); }
+function dragLeave(zoneId) { document.getElementById(zoneId).classList.remove('drag'); }
+function dropFile(e, zoneId, inputId) {
+  e.preventDefault();
+  dragLeave(zoneId);
+  const files = e.dataTransfer.files;
+  if (files.length) {
+    const inp = document.getElementById(inputId);
+    const dt = new DataTransfer(); dt.items.add(files[0]);
+    inp.files = dt.files;
+    const previewId = inputId.replace('-file', '-preview');
+    previewUpload(inputId, previewId, zoneId);
+  }
+}
+
+// ===== TOAST =====
+function toast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  setTimeout(() => t.className = '', 3500);
+}
+
+// ===== SHOW LOADING =====
+function showLoading(outputId, color = '') {
+  document.getElementById(outputId).innerHTML = `
+    <div class="loading-state">
+      <div class="loader ${color}"></div>
+      <p>Generating...</p>
+      <div class="prog-bar"><div class="prog-fill" id="prog-${outputId}"></div></div>
+    </div>`;
+  animateProgress(`prog-${outputId}`);
+}
+
+function animateProgress(id) {
+  let w = 0;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const iv = setInterval(() => {
+    w = Math.min(w + Math.random() * 3, 88);
+    if (el) el.style.width = w + '%';
+    else clearInterval(iv);
+  }, 400);
+  el._iv = iv;
+}
+function finishProgress(outputId) {
+  const el = document.getElementById(`prog-${outputId}`);
+  if (el) { clearInterval(el._iv); el.style.width = '100%'; }
+}
+
+// ===== FILE TO BASE64 =====
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+// ===== DOWNLOAD HELPER =====
+function downloadMedia(url, ext) {
+  const a = document.createElement('a');
+  a.href = url; a.download = `qwen-studio-${Date.now()}.${ext}`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ===== API CALL: IMAGE GENERATION =====
+async function generateImage() {
+  const prompt = document.getElementById('gen-prompt').value.trim();
+  if (!prompt) { toast('Isi prompt terlebih dahulu', 'err'); return; }
+  const model = document.getElementById('gen-model').value;
+  const negative = document.getElementById('gen-negative').value.trim();
+  const [w, h] = state.genSize.split('*');
+  const count = parseInt(state.genCount);
+  const steps = document.getElementById('gen-steps').value;
+  const cfg = document.getElementById('gen-cfg').value;
+  const seed = parseInt(document.getElementById('gen-seed').value) || 0;
+  const finalPrompt = state.genStyle ? `${prompt}, ${state.genStyle} style` : prompt;
+
+  showLoading('gen-output', '');
+  toast('Generating image...', 'info');
+
+  try {
+    const body = {
+      model,
+      input: {
+        prompt: finalPrompt,
+        ...(negative && { negative_prompt: negative })
+      },
+      parameters: {
+        size: `${w}*${h}`,
+        n: count,
+        steps: parseInt(steps),
+        cfg_scale: parseFloat(cfg),
+        ...(seed > 0 && { seed })
+      }
+    };
+
+    const res = await apiFetch(`${COMPAT_BASE}/images/generations`, {
+      method: 'POST',
+      headers: { 'X-DashScope-Async': 'enable' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (data.output?.task_id) {
+      await pollTask(data.output.task_id, 'gen-output', 'image');
+    } else if (data.output?.results) {
+      renderImageResults('gen-output', data.output.results);
+    } else {
+      throw new Error(data.message || data.error?.message || JSON.stringify(data));
+    }
+  } catch (e) {
+    finishProgress('gen-output');
+    document.getElementById('gen-output').innerHTML = `<div class="output-placeholder"><div class="ph-icon">❌</div><p style="color:var(--error)">${e.message}</p></div>`;
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+// ===== API CALL: EDIT IMAGE =====
+async function editImage() {
+  const prompt = document.getElementById('edit-prompt').value.trim();
+  if (!prompt) { toast('Isi instruksi edit', 'err'); return; }
+  if (!state.editFile) { toast('Upload minimal 1 gambar sumber', 'err'); return; }
+  const model = document.getElementById('edit-model').value;
+  const [w, h] = state.editSize.split('*');
+  const count = parseInt(state.editCount);
+  const negative = document.getElementById('edit-negative').value.trim();
+  const promptExtend = document.getElementById('edit-prompt-extend').classList.contains('on');
+  const watermark = document.getElementById('edit-watermark').classList.contains('on');
+
+  showLoading('edit-output', 'pink');
+  toast('Processing edit...', 'info');
+
+  try {
+    // Build content array: images first, then text instruction
+    const content = [];
+    const b64_1 = await fileToBase64(state.editFile);
+    content.push({ image: `data:${state.editFile.type};base64,${b64_1}` });
+    if (state.editFile2) {
+      const b64_2 = await fileToBase64(state.editFile2);
+      content.push({ image: `data:${state.editFile2.type};base64,${b64_2}` });
+    }
+    if (state.editFile3) {
+      const b64_3 = await fileToBase64(state.editFile3);
+      content.push({ image: `data:${state.editFile3.type};base64,${b64_3}` });
+    }
+    content.push({ text: prompt });
+
+    const body = {
+      model,
+      input: {
+        messages: [{ role: 'user', content }]
+      },
+      parameters: {
+        n: model === 'qwen-image-edit' ? 1 : count,
+        size: `${w}*${h}`,
+        prompt_extend: promptExtend,
+        watermark: watermark,
+        ...(negative && { negative_prompt: negative })
+      }
+    };
+
+    const EDIT_ENDPOINT = `${NATIVE_BASE}/services/aigc/multimodal-generation/generation`;
+    const res = await apiFetch(EDIT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'X-DashScope-Async': 'enable' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (data.output?.task_id) {
+      await pollTask(data.output.task_id, 'edit-output', 'image-edit');
+    } else if (data.output?.choices) {
+      // Sync response with choices
+      renderEditResults('edit-output', data.output.choices);
+    } else {
+      throw new Error(data.message || data.code || JSON.stringify(data));
+    }
+  } catch (e) {
+    finishProgress('edit-output');
+    document.getElementById('edit-output').innerHTML = `<div class="output-placeholder"><div class="ph-icon">❌</div><p style="color:var(--error)">${e.message}</p></div>`;
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+// ===== API CALL: VIDEO =====
+async function generateVideo(mode) {
+  const outputId = mode === 'text' ? 't2v-output' : 'i2v-output';
+
+  if (mode === 'text') {
+    const prompt = document.getElementById('t2v-prompt').value.trim();
+    if (!prompt) { toast('Isi prompt video', 'err'); return; }
+    const model = document.getElementById('t2v-model').value;
+    const dur = parseInt(state.t2vDur);
+    const fps = parseInt(state.t2vFps);
+    const [w, h] = state.t2vRes.split('*');
+    const negative = document.getElementById('t2v-negative').value.trim();
+    const finalPrompt = state.t2vStyle ? `${prompt}, ${state.t2vStyle} style` : prompt;
+
+    showLoading(outputId, 'teal');
+    toast('Submitting video job...', 'info');
+
+    try {
+      const body = {
+        model,
+        input: { prompt: finalPrompt, ...(negative && { negative_prompt: negative }) },
+        parameters: {
+          resolution: `${w}*${h}`,
+          duration: dur,
+          fps
+        }
+      };
+      const res = await apiFetch(`${COMPAT_BASE}/video/generations`, {
+        method: 'POST',
+        headers: { 'X-DashScope-Async': 'enable' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.output?.task_id) {
+        await pollTask(data.output.task_id, outputId, 'video');
+      } else {
+        throw new Error(data.message || data.error?.message || JSON.stringify(data));
+      }
+    } catch (e) {
+      finishProgress(outputId);
+      document.getElementById(outputId).innerHTML = `<div class="output-placeholder"><div class="ph-icon">❌</div><p style="color:var(--error)">${e.message}</p></div>`;
+      toast('Error: ' + e.message, 'err');
+    }
+
+  } else {
+    if (!state.i2vFile) { toast('Upload gambar terlebih dahulu', 'err'); return; }
+    const model = document.getElementById('i2v-model').value;
+    const dur = parseInt(state.i2vDur);
+    const fps = parseInt(state.i2vFps);
+    const [w, h] = state.i2vRes.split('*');
+    const prompt = document.getElementById('i2v-prompt').value.trim();
+
+    showLoading(outputId, 'teal');
+    toast('Submitting animation job...', 'info');
+
+    try {
+      const b64 = await fileToBase64(state.i2vFile);
+      const body = {
+        model,
+        input: {
+          ...(prompt && { prompt }),
+          image: `data:${state.i2vFile.type};base64,${b64}`
+        },
+        parameters: {
+          resolution: `${w}*${h}`,
+          duration: dur,
+          fps
+        }
+      };
+      const res = await apiFetch(`${COMPAT_BASE}/video/generations`, {
+        method: 'POST',
+        headers: { 'X-DashScope-Async': 'enable' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.output?.task_id) {
+        await pollTask(data.output.task_id, outputId, 'video');
+      } else {
+        throw new Error(data.message || data.error?.message || JSON.stringify(data));
+      }
+    } catch (e) {
+      finishProgress(outputId);
+      document.getElementById(outputId).innerHTML = `<div class="output-placeholder"><div class="ph-icon">❌</div><p style="color:var(--error)">${e.message}</p></div>`;
+      toast('Error: ' + e.message, 'err');
+    }
+  }
+}
+
+// ===== POLL TASK =====
+async function pollTask(taskId, outputId, type) {
+  const maxAttempts = type === 'video' ? 120 : 60;
+  let attempt = 0;
+
+  // Correct polling endpoint per type
+  const taskUrl = (type === 'image-edit')
+    ? `${NATIVE_BASE}/tasks/${taskId}`
+    : `${COMPAT_BASE}/tasks/${taskId}`;
+
+  const check = async () => {
+    attempt++;
+    try {
+      const res = await apiFetch(taskUrl);
+      const data = await res.json();
+      const status = data.output?.task_status;
+
+      if (status === 'SUCCEEDED') {
+        finishProgress(outputId);
+        if (type === 'image') {
+          renderImageResults(outputId, data.output.results || []);
+        } else if (type === 'image-edit') {
+          // image-edit returns output.choices[].message.content[].image
+          const choices = data.output?.choices;
+          if (choices && choices.length > 0) {
+            renderEditResults(outputId, choices);
+          } else {
+            // fallback: check results
+            renderImageResults(outputId, data.output?.results || []);
+          }
+        } else {
+          renderVideoResult(outputId, data.output?.video_url || data.output?.output_video_url);
+        }
+        toast('Berhasil!', 'ok');
+      } else if (status === 'FAILED') {
+        throw new Error('Task failed: ' + (data.output?.message || data.message || 'Unknown error'));
+      } else if (attempt < maxAttempts) {
+        const delay = type === 'video' ? 5000 : 3000;
+        setTimeout(check, delay);
+      } else {
+        throw new Error('Timeout: task terlalu lama');
+      }
+    } catch (e) {
+      finishProgress(outputId);
+      document.getElementById(outputId).innerHTML = `<div class="output-placeholder"><div class="ph-icon">❌</div><p style="color:var(--error)">${e.message}</p></div>`;
+      toast('Error: ' + e.message, 'err');
+    }
+  };
+
+  setTimeout(check, 2000);
+}
+
+// ===== RENDER RESULTS =====
+function renderImageResults(outputId, results) {
+  if (!results || results.length === 0) {
+    document.getElementById(outputId).innerHTML = `<div class="output-placeholder"><div class="ph-icon">⚠️</div><p>Tidak ada hasil</p></div>`;
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'results-grid';
+  results.forEach(r => {
+    const url = r.url || r.b64_json;
+    const src = r.b64_json ? `data:image/png;base64,${r.b64_json}` : url;
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    item.innerHTML = `
+      <img src="${src}" alt="generated" loading="lazy">
+      <div class="result-overlay">
+        <button class="result-btn rb-dl" onclick="downloadMedia('${src}','png')">↓ Save</button>
+        <button class="result-btn rb-use" onclick="useAsInput('${src}')">Use</button>
+      </div>`;
+    grid.appendChild(item);
+  });
+  document.getElementById(outputId).innerHTML = '';
+  document.getElementById(outputId).appendChild(grid);
+}
+
+// Render results from qwen-image-edit API (choices format)
+function renderEditResults(outputId, choices) {
+  const images = [];
+  choices.forEach(choice => {
+    const content = choice.message?.content || [];
+    content.forEach(c => {
+      if (c.image) images.push(c.image);
+    });
+  });
+  if (images.length === 0) {
+    document.getElementById(outputId).innerHTML = `<div class="output-placeholder"><div class="ph-icon">⚠️</div><p>Tidak ada hasil gambar</p></div>`;
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'results-grid';
+  images.forEach(src => {
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    item.innerHTML = `
+      <img src="${src}" alt="edited" loading="lazy">
+      <div class="result-overlay">
+        <button class="result-btn rb-dl" onclick="downloadMedia('${src}','png')">↓ Save</button>
+        <button class="result-btn rb-use" onclick="useAsInput('${src}')">Use</button>
+      </div>`;
+    grid.appendChild(item);
+  });
+  document.getElementById(outputId).innerHTML = '';
+  document.getElementById(outputId).appendChild(grid);
+}
+
+function renderVideoResult(outputId, url) {
+  if (!url) {
+    document.getElementById(outputId).innerHTML = `<div class="output-placeholder"><div class="ph-icon">⚠️</div><p>URL video tidak tersedia</p></div>`;
+    return;
+  }
+  document.getElementById(outputId).innerHTML = `
+    <div style="padding:16px;width:100%">
+      <div class="video-preview-wrap">
+        <video controls autoplay loop src="${url}" style="width:100%;border-radius:10px;max-height:400px"></video>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn-gen teal" style="flex:1;padding:10px" onclick="downloadMedia('${url}','mp4')">↓ Download MP4</button>
+      </div>
+    </div>`;
+}
+
+// ===== CONNECTION CHECK =====
+(async function checkConnection() {
+  const badge = document.getElementById('conn-badge');
+  const dot = document.getElementById('conn-dot');
+  const banner = document.getElementById('cors-banner');
+
+  // Test proxy connectivity (works both on Vercel and localhost)
+  try {
+    const testUrl = `${COMPAT_BASE}/models`;
+    const r = await fetch(proxyWrap(testUrl), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    // 401 = proxy ok tapi API key salah, 200/404 = ok
+    if (r.ok || r.status === 404 || r.status === 401 || r.status === 200) {
+      badge.textContent = 'API READY';
+      dot.style.background = 'var(--success)';
+      dot.style.boxShadow = '0 0 8px var(--success)';
+      banner.style.display = 'none';
+    } else {
+      throw new Error('Status ' + r.status);
+    }
+  } catch {
+    badge.textContent = 'API ERROR';
+    dot.style.background = 'var(--error)';
+    dot.style.boxShadow = '0 0 8px var(--error)';
+    banner.style.display = 'block';
+  }
+})();
+function useAsInput(src) {
+  // Switch to I2V tab and load image
+  switchTab('video-img');
+  const img = document.getElementById('i2v-preview');
+  img.src = src; img.style.display = 'block';
+  // Convert to file object
+  fetch(src).then(r => r.blob()).then(b => {
+    state.i2vFile = new File([b], 'used-image.png', { type: 'image/png' });
+    toast('Gambar siap di Image→Video', 'ok');
+  }).catch(() => toast('Gunakan tab Image→Video secara manual', 'info'));
+}
+</script>
+</body>
+</html>
